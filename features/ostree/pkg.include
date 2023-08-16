@@ -1,0 +1,4 @@
+ostree
+ostree-boot
+dracut
+systemd-boot
