@@ -81,7 +81,20 @@ root_partition=$(mktemp)
 partitions=$(mktemp)
 
 boot_dir=$(mktemp -d)
-cp -r $OSTREE_SYSROOT/boot/. $boot_dir
+
+echo ==== DEBUG ====
+echo BOOT_DIR: $boot_dir
+ls -la $boot_dir
+
+echo OSTREE_SYSROOT/boot: $OSTREE_SYSROOT/boot
+ls -la $OSTREE_SYSROOT/boot
+
+cp -r $OSTREE_SYSROOT/boot/* $boot_dir
+
+echo BOOT_DIR: $boot_dir
+ls -la $boot_dir
+rm -rf $boot_dir/loader
+rm -rf $boot_dir/loader.1
 
 mount --bind $boot_dir $rootfs_work/boot/efi
 mount --rbind /proc $rootfs_work/proc
@@ -95,15 +108,16 @@ umount $rootfs_work/boot/efi
 
 
 truncate -s 1G "$efi_partition"
-make_reproducible_vfat $OSTREE_SYSROOT/boot "$efi_partition"
-size=$(du -b "$efi_partition" | awk '{ padded_size = $1 + (MB - ($1 % MB) % MB); print (padded_size / MB) }' "MB=1048576")
+# make_reproducible_vfat $OSTREE_SYSROOT/boot "$efi_partition"
+make_reproducible_vfat $boot_dir "$efi_partition"
+size_uefi=$(du -b "$efi_partition" | awk '{ padded_size = $1 + (MB - ($1 % MB) % MB); print (padded_size / MB) }' "MB=1048576")
 part_uuid_uefi=b0e0359c-007b-4361-a0d1-a7ca2d73fe3c
-echo -e "$part_uuid_uefi\tuefi\t$size\t0\t$efi_partition\tEFI" >> "$partitions"
+echo -e "$part_uuid_uefi\tuefi\t$size_uefi\t0\t$efi_partition\tEFI" >> "$partitions"
 
 truncate -s 4G "$root_partition"
 make_reproducible_ext4 -l ROOT "$MYROOT" "$root_partition"
-size=$(du -b "$root_partition" | awk '{ padded_size = $1 + (MB - ($1 % MB) % MB); print (padded_size / MB) }' "MB=1048576")
+size_rootfs=$(du -b "$root_partition" | awk '{ padded_size = $1 + (MB - ($1 % MB) % MB); print (padded_size / MB) }' "MB=1048576")
 part_uuid_rootfs=a9bef950-8218-4888-9f1c-1ad8bb481807
-echo -e "$part_uuid_rootfs\tlinux\t$size\t0\t$root_partition\tROOT" >> "$partitions"
+echo -e "$part_uuid_rootfs\tlinux\t$size_rootfs\t0\t$root_partition\tROOT" >> "$partitions"
 
 makedisk $rootfs_work "$output" < "$partitions"
