@@ -91,10 +91,12 @@ ls -la $OSTREE_SYSROOT/boot
 
 cp -r $OSTREE_SYSROOT/boot/* $boot_dir
 
+LOADER_TEMP=$(mktemp -d)
+
 echo BOOT_DIR: $boot_dir
 ls -la $boot_dir
 rm -rf $boot_dir/loader
-rm -rf $boot_dir/loader.1
+mv $boot_dir/loader.1 $LOADER_TEMP
 
 mount --bind $boot_dir $rootfs_work/boot/efi
 mount --rbind /proc $rootfs_work/proc
@@ -105,6 +107,9 @@ SYSTEMD_ESP_PATH=/boot/efi chroot $rootfs_work bootctl --no-variables install
 umount -l $rootfs_work/proc
 umount -l $rootfs_work/sys
 umount $rootfs_work/boot/efi
+
+cp -r $LOADER_TEMP/* $boot_dir/loader.1
+cp -r $LOADER_TEMP/* $boot_dir/loader
 
 
 truncate -s 1G "$efi_partition"
