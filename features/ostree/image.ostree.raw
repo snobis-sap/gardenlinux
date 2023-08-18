@@ -98,6 +98,8 @@ ls -la $boot_dir
 rm -rf $boot_dir/loader
 mv $boot_dir/loader.1 $LOADER_TEMP
 
+find $LOADER_TEMP
+
 mount --bind $boot_dir $rootfs_work/boot/efi
 mount --rbind /proc $rootfs_work/proc
 mount --rbind /sys $rootfs_work/sys
@@ -110,6 +112,8 @@ umount $rootfs_work/boot/efi
 
 cp -r $LOADER_TEMP/* $boot_dir/loader.1
 cp -r $LOADER_TEMP/* $boot_dir/loader
+
+cp $boot_dir/loader/loader.1/entries/* $boot_dir/loader/entries
 
 
 truncate -s 1G "$efi_partition"
