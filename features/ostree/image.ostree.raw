@@ -33,8 +33,6 @@ output="$2"
 tar xf "$rootfs" -C "$rootfs_work"
 # cp -a "$rootfs/." "$rootfs_work"
 
-
-
 find "$rootfs_work/var/log/" -type f -delete
 
 kernel="$(find "$rootfs_work"/boot -name 'vmlinuz-*' | sort -V | tail -n 1)"
@@ -54,7 +52,7 @@ ostree admin init-fs --modern $OSTREE_SYSROOT
 ostree init --mode=archive --repo=$OSTREE_REPO
 ostree admin os-init --sysroot=$OSTREE_SYSROOT gardenlinux
 ostree config --repo=$OSTREE_REPO set sysroot.bootloader none
-ostree commit --repo=$OSTREE_REPO --branch $OSTREE_REF --skip-if-unchanged -s "First Commit" --no-xattrs "$rootfs_work"
+ostree commit --repo=$OSTREE_REPO --branch $OSTREE_REF --skip-if-unchanged -s "Gardenlinux build $(date)" --no-xattrs "$rootfs_work"
 # fixme: what does the '--karg-append=ro' do?
 ostree admin deploy --karg=root=LABEL=ROOT --karg-append=efi=runtime --karg-append=systemd.journald.forward_to_console=1 --sysroot=$OSTREE_SYSROOT --os=gardenlinux $OSTREE_REF
 
@@ -65,29 +63,11 @@ echo "--- DEBUG --- mydir $mydir"
 mkdir -p "$OSTREE_SYSROOT"/ostree/boot.1.1/gardenlinux/$mydir/0/sysroot
 
 
-
-
-# wanted: raw disk image file with 2 partitions
-# efi partition
-# rootfs: "$rootfs_work"
-
-# cp -r $OSTREE_SYSROOT/boot/. "$MYROOT"/boot/efi/.
-
-
-# makepart "$MYROOT" < /builder/features/ostree/fstab | makedisk "$MYROOT" "$output"
-
 efi_partition=$(mktemp)
 root_partition=$(mktemp)
 partitions=$(mktemp)
 
 boot_dir=$(mktemp -d)
-
-echo ==== DEBUG ====
-echo BOOT_DIR: $boot_dir
-ls -la $boot_dir
-
-echo OSTREE_SYSROOT/boot: $OSTREE_SYSROOT/boot
-ls -la $OSTREE_SYSROOT/boot
 
 cp -r $OSTREE_SYSROOT/boot/* $boot_dir
 
@@ -119,7 +99,7 @@ cat $boot_dir/loader/entries/*
 
 echo 'timeout 30' > $boot_dir/loader/loader.conf
 
-
+# fixme: make disk size dynamic
 truncate -s 1G "$efi_partition"
 # make_reproducible_vfat $OSTREE_SYSROOT/boot "$efi_partition"
 make_reproducible_vfat $boot_dir "$efi_partition"
