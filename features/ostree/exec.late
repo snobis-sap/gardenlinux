@@ -57,3 +57,15 @@ done
 sed 's/boot\/efi\///' -i /boot/efi/loader/entries/*.conf
 
 SYSTEMD_ESP_PATH=/boot/efi bootctl --no-variables install
+
+# systemctl disable ignition-disable.service
+# systemctl disable rsyslog.service
+# systemctl disable systemd-repart.service
+# systemctl disable syslog.socket
+
+rm /etc/systemd/system/ignition-disable.service
+rm /usr/lib/systemd/system/syslog.socket
+rm /var/lib/systemd/deb-systemd-helper-enabled/multi-user.target.wants/rsyslog.service
+rm /usr/lib/systemd/system/initrd-root-fs.target.wants/systemd-repart.service
+rm /usr/lib/systemd/system/sysinit.target.wants/systemd-repart.service
+rm /usr/lib/systemd/system/systemd-repart.service

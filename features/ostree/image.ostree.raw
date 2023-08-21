@@ -2,102 +2,77 @@
 
 set -euxo pipefail
 
-rootfs_work="$(mktemp -d)"
-
-mount -t tmpfs tmpfs "$rootfs_work"
-
 export PATH="/builder/image.d:$PATH"
 
+rootfs_work="$(mktemp -d)"
+mount -t tmpfs tmpfs "$rootfs_work"
 
-MYROOT="$(mktemp -d)" # fixme: recursive?
+MYROOT="$(mktemp -d)"
 mount -t tmpfs tmpfs "$MYROOT"
-
-# mkdir -p "$MYROOT"/etc
-# mkdir -p "$MYROOT"/proc
-# mkdir -p "$MYROOT"/dev
-# mkdir -p "$MYROOT"/sys
-# mkdir -p "$MYROOT"/tmp
-# mkdir -p "$MYROOT"/boot/efi
 mkdir -p "$MYROOT"/sysroot
-
 OSTREE_SYSROOT="$MYROOT/sysroot"
-
 OSTREE_REPO=$OSTREE_SYSROOT/ostree/repo
 OSTREE_REF="gardenlinux/today/$BUILDER_ARCH"
-
 
 rootfs="$1"
 output="$2"
 
-
 tar xf "$rootfs" -C "$rootfs_work"
-# cp -a "$rootfs/." "$rootfs_work"
 
 find "$rootfs_work/var/log/" -type f -delete
 
 kernel="$(find "$rootfs_work"/boot -name 'vmlinuz-*' | sort -V | tail -n 1)"
 version="${kernel#*-}"
 
-
 # ostree kernel location: https://ostreedev.github.io/ostree/deployment/#contents-of-a-deployment
 mkdir -p "$rootfs_work"/usr/lib/modules/$version/
 cp "$rootfs_work"/boot/vmlinuz* "$rootfs_work"/usr/lib/modules/$version/vmlinuz
 cp "$rootfs_work/boot/initrd.img-$version" "$rootfs_work"/usr/lib/modules/$version/initramfs.img
 
-
 mv "$rootfs_work"/etc "$rootfs_work"/usr/etc
-
 
 ostree admin init-fs --modern $OSTREE_SYSROOT
 ostree init --mode=archive --repo=$OSTREE_REPO
 ostree admin os-init --sysroot=$OSTREE_SYSROOT gardenlinux
 ostree config --repo=$OSTREE_REPO set sysroot.bootloader none
 ostree commit --repo=$OSTREE_REPO --branch $OSTREE_REF --skip-if-unchanged -s "Gardenlinux build $(date)" --no-xattrs "$rootfs_work"
-# fixme: what does the '--karg-append=ro' do?
-ostree admin deploy --karg=root=LABEL=ROOT --karg-append=efi=runtime --karg-append=systemd.journald.forward_to_console=1 --sysroot=$OSTREE_SYSROOT --os=gardenlinux $OSTREE_REF
+ostree admin deploy --karg=root=LABEL=ROOT --karg-append=rw --karg-append=efi=runtime --karg-append=systemd.journald.forward_to_console=1 --sysroot=$OSTREE_SYSROOT --os=gardenlinux $OSTREE_REF
 
+boot_hash=`ls "$OSTREE_SYSROOT"/ostree/boot.1.1/gardenlinux/`
+mkdir -p "$OSTREE_SYSROOT"/ostree/boot.1.1/gardenlinux/$boot_hash/0/sysroot
 
+mkdir -p "$OSTREE_SYSROOT"/ostree/deploy/gardenlinux/var/home
+mkdir -p "$OSTREE_SYSROOT"/ostree/deploy/gardenlinux/var/roothome
+mkdir -p "$OSTREE_SYSROOT"/ostree/deploy/gardenlinux/var/opt
+mkdir -p "$OSTREE_SYSROOT"/ostree/deploy/gardenlinux/var/srv
 
-mydir=`ls "$OSTREE_SYSROOT"/ostree/boot.1.1/gardenlinux/`
-echo "--- DEBUG --- mydir $mydir"
-mkdir -p "$OSTREE_SYSROOT"/ostree/boot.1.1/gardenlinux/$mydir/0/sysroot
-
+# Build disk image, this is hacky as of now, needs rework
+# Setup bootloader
+boot_dir=$(mktemp -d)
+cp -r $OSTREE_SYSROOT/boot/* $boot_dir
+LOADER_TEMP=$(mktemp -d)
+echo BOOT_DIR: $boot_dir
+ls -la $boot_dir
+rm -rf $boot_dir/loader
+# move to temp dir to avoid errors with systemd-boot install
+mv $boot_dir/loader.1 $LOADER_TEMP
+mount --bind $boot_dir $rootfs_work/boot/efi
+mount --rbind /proc $rootfs_work/proc
+mount --rbind /sys $rootfs_work/sys
+SYSTEMD_ESP_PATH=/boot/efi chroot $rootfs_work bootctl --no-variables install
+umount -l $rootfs_work/proc
+umount -l $rootfs_work/sys
+umount $rootfs_work/boot/efi
+# recover from temp dir
+cp -r $LOADER_TEMP/* $boot_dir/loader.1
+cp -r $LOADER_TEMP/* $boot_dir/loader
+cp $boot_dir/loader/loader.1/entries/* $boot_dir/loader/entries
+cat $boot_dir/loader/entries/*
+echo 'timeout 7' > $boot_dir/loader/loader.conf
 
 efi_partition=$(mktemp)
 root_partition=$(mktemp)
 partitions=$(mktemp)
-
-boot_dir=$(mktemp -d)
-
-cp -r $OSTREE_SYSROOT/boot/* $boot_dir
-
-LOADER_TEMP=$(mktemp -d)
-
-echo BOOT_DIR: $boot_dir
-ls -la $boot_dir
-rm -rf $boot_dir/loader
-mv $boot_dir/loader.1 $LOADER_TEMP
-
-find $LOADER_TEMP
-
-mount --bind $boot_dir $rootfs_work/boot/efi
-mount --rbind /proc $rootfs_work/proc
-mount --rbind /sys $rootfs_work/sys
-
-SYSTEMD_ESP_PATH=/boot/efi chroot $rootfs_work bootctl --no-variables install
-
-umount -l $rootfs_work/proc
-umount -l $rootfs_work/sys
-umount $rootfs_work/boot/efi
-
-cp -r $LOADER_TEMP/* $boot_dir/loader.1
-cp -r $LOADER_TEMP/* $boot_dir/loader
-
-cp $boot_dir/loader/loader.1/entries/* $boot_dir/loader/entries
-
-cat $boot_dir/loader/entries/*
-
-echo 'timeout 30' > $boot_dir/loader/loader.conf
 
 # fixme: make disk size dynamic
 truncate -s 1G "$efi_partition"

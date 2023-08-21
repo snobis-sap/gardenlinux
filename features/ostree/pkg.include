@@ -1,4 +1,5 @@
+dracut
 ostree
 ostree-boot
-dracut
+podman
 systemd-boot
