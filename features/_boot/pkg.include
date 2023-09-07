@@ -1,4 +1,2 @@
 dracut
-systemd-boot
-$(if [ $arch = amd64 ]; then echo syslinux; fi)
-$(if [ $arch = amd64 ]; then echo syslinux-common; fi)
+grub-efi-arm64
