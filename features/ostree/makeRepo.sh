@@ -4,6 +4,8 @@ set -eufo pipefail
 
 # Call this script from the root of the gardenlinux repo as:
 # ./features/ostree/makeRepo.sh .build/kvm_dev-ostree-arm64-today-local.tar
+# Can be served with this command from the root of the gardenlinux repo:
+# docker run --name ostree-repo -v $PWD/.build/ostree-repo:/usr/share/nginx/html:ro -p 8000:80 nginx
 
 OSTREE_REPO=.build/ostree-repo
 OSTREE_ROOTFS=.build/ostree-rootfs
