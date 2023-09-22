@@ -22,8 +22,9 @@ tar xf "$rootfs" -C "$rootfs_work"
 mv "$rootfs_work"/etc "$rootfs_work"/usr/etc
 
 # export G_MESSAGES_DEBUG=all
-ostree admin init-fs --modern $OSTREE_SYSROOT
+mkdir -p $OSTREE_REPO
 ostree init --mode=archive --repo=$OSTREE_REPO
+ostree admin init-fs --modern $OSTREE_SYSROOT
 ostree admin os-init --sysroot=$OSTREE_SYSROOT gardenlinux
 ostree config --repo=$OSTREE_REPO set sysroot.bootloader none
 ostree commit --repo=$OSTREE_REPO --branch $OSTREE_REF --skip-if-unchanged -s "Gardenlinux build $(date)" --no-xattrs "$rootfs_work"
